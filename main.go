@@ -3,28 +3,47 @@ package main
 import (
 	"net/http"
 
-	"github.com/Dmitriy4565/VapeShop/internal/db"
-	"github.com/Dmitriy4565/VapeShop/internal/services"
-	"github.com/gin-gonic/gin" // Используем Gin для HTTP-обработки
+	"VapeShop-ClientAPI/internal/config"
+	"VapeShop-ClientAPI/internal/controllers"
+	"VapeShop-ClientAPI/internal/db"
+	"VapeShop-ClientAPI/internal/middleware"
+	"VapeShop-ClientAPI/internal/services"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
 	router          *gin.Engine
 	categoryService services.CategoryService
+	productService  services.ProductService
+	purchaseService services.PurchaseService
 }
 
-func NewServer(db *db.DB) *Server {
+func NewServer(db *db.DB, cfg *config.Config) *Server {
 	router := gin.Default()
 
-	categoryService := services.NewCategoryService(db)
+	router.Use(middleware.Cors())
 
-	categoryController := NewCategoryController(categoryService)
+	categoryService := services.NewCategoryService(db.DB)
+	productService := services.NewProductService(db.DB)
+	purchaseService := services.NewPurchaseService(db.DB)
 
-	router.GET("/categories", categoryController.GetCategoriesHandler)
+	categoryController := controllers.NewCategoryController(categoryService)
+	productController := controllers.NewProductController(productService)
+	purchaseController := controllers.NewPurchaseController(purchaseService)
+
+	v1 := router.Group("/api/v1")
+	{
+		v1.GET("/categories", categoryController.GetCategoriesHandler)
+		v1.GET("/products", productController.GetProductsHandler)
+		v1.POST("/purchases", purchaseController.CreatePurchaseHandler)
+	}
 
 	return &Server{
 		router:          router,
 		categoryService: categoryService,
+		productService:  productService,
+		purchaseService: purchaseService,
 	}
 }
 
@@ -32,18 +51,19 @@ func (s *Server) Run(addr string) error {
 	return http.ListenAndServe(addr, s.router)
 }
 
-func NewCategoryController(categoryService services.CategoryService) *CategoryController {
-	return &CategoryController{
-		categoryService: categoryService,
-	}
-}
-
-func (c *CategoryController) GetCategoriesHandler(ctx *gin.Context) {
-	categories, err := c.categoryService.GetAllCategories(ctx)
+func main() {
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
-	ctx.JSON(http.StatusOK, categories)
-}
 
+	db, err := db.NewDB(cfg.DB)
+	if err != nil {
+		panic(err)
+	}
+
+	server := NewServer(db, cfg)
+	if err := server.Run(cfg.ServerAddress); err != nil {
+		panic(err)
+	}
+}

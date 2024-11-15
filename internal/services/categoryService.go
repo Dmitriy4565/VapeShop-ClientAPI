@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
-
-	"github.com/Dmitriy4565/VapeShop/internal/db"
 )
 
 type Category struct {
@@ -20,15 +19,15 @@ type CategoryService interface {
 	GetAllCategories(ctx context.Context) ([]Category, error)
 	GetCategoryByID(ctx context.Context, id string) (*Category, error)
 	CreateCategory(ctx context.Context, category Category) (*Category, error)
-	UpdateCategory(ctx context.Context, category Category) error
+	UpdateCategory(ctx context.Context, category Category) (*Category, error)
 	DeleteCategory(ctx context.Context, id string) error
 }
 
 type CategoryServiceImpl struct {
-	db *db.DB // Ссылка на объект базы данных
+	db *sql.DB // Ссылка на объект базы данных
 }
 
-func NewCategoryService(db *db.DB) *CategoryServiceImpl {
+func NewCategoryService(db *sql.DB) *CategoryServiceImpl {
 	return &CategoryServiceImpl{
 		db: db,
 	}
@@ -75,13 +74,26 @@ func (s *CategoryServiceImpl) CreateCategory(ctx context.Context, category Categ
 	if err != nil {
 		return nil, err
 	}
-	category.ID = lastInsertID
+	category.ID = fmt.Sprintf("%d", lastInsertID)
 	return &category, nil
 }
 
-func (s *CategoryServiceImpl) UpdateCategory(ctx context.Context, category Category) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE categories SET name = $1 WHERE id = $2", category.Name, category.ID)
-	return err
+func (s *CategoryServiceImpl) UpdateCategory(ctx context.Context, category Category) (*Category, error) {
+	res, err := s.db.ExecContext(ctx, "UPDATE categories SET name = $1 WHERE id = $2", category.Name, category.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	if rowsAffected == 0 {
+		return nil, errors.New("категория не найдена") // Обработка случая, когда категория не найдена
+	}
+
+	return &category, nil // Возвращаем обновлённую категорию
 }
 
 func (s *CategoryServiceImpl) DeleteCategory(ctx context.Context, id string) error {

@@ -1,13 +1,14 @@
-package services //заменить s.db на фактическое подключение к бд, но это в конце после маина
+package services
 
 import (
 	"context"
-	"errors"
-	"time"
-
 	"database/sql"
+	"errors"
+	"fmt"
+	"time"
 )
 
+// Product - структура, представляющая продукт.
 type Product struct {
 	ID             string    `json:"id"`
 	ManufacturerID string    `json:"manufacturerId"`
@@ -19,25 +20,28 @@ type Product struct {
 }
 
 type ProductService interface {
-	GetAllProducts() ([]Product, error)
-	GetProductByID(id string) (*Product, error)
-	CreateProduct(product Product) (*Product, error)
-	UpdateProduct(product Product) error
-	DeleteProduct(id string) error
+	GetAllProducts(ctx context.Context) ([]Product, error)
+	GetProductByID(ctx context.Context, id string) (*Product, error)
+	CreateProduct(ctx context.Context, product Product) (*Product, error)
+	UpdateProduct(ctx context.Context, product Product) (*Product, error)
+	DeleteProduct(ctx context.Context, id string) error
 }
 
+// ProductServiceImpl - реализация сервиса для работы с продуктами.
 type ProductServiceImpl struct {
 	db *sql.DB // Ссылка на объект базы данных
 }
 
+// NewProductService - функция для создания нового сервиса продуктов.
 func NewProductService(db *sql.DB) *ProductServiceImpl {
 	return &ProductServiceImpl{
 		db: db,
 	}
 }
 
-func (s *ProductServiceImpl) GetAllProducts() ([]Product, error) {
-	rows, err := s.db.QueryContext(context.Background(), "SELECT * FROM products")
+// GetAllProducts - получение списка всех продуктов.
+func (s *ProductServiceImpl) GetAllProducts(ctx context.Context) ([]Product, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT * FROM products")
 	if err != nil {
 		return nil, err
 	}
@@ -55,9 +59,10 @@ func (s *ProductServiceImpl) GetAllProducts() ([]Product, error) {
 	return products, nil
 }
 
-func (s *ProductServiceImpl) GetProductByID(id string) (*Product, error) {
+// GetProductByID - получение продукта по его ID.
+func (s *ProductServiceImpl) GetProductByID(ctx context.Context, id string) (*Product, error) {
 	var product Product
-	err := s.db.QueryRowContext(context.Background(), "SELECT * FROM products WHERE id = $1", id).Scan(&product.ID, &product.ManufacturerID, &product.Name, &product.Description, &product.Price, &product.CreatedAt, &product.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, "SELECT * FROM products WHERE id = $1", id).Scan(&product.ID, &product.ManufacturerID, &product.Name, &product.Description, &product.Price, &product.CreatedAt, &product.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("продукт не найден")
@@ -67,8 +72,8 @@ func (s *ProductServiceImpl) GetProductByID(id string) (*Product, error) {
 	return &product, nil
 }
 
-func (s *ProductServiceImpl) CreateProduct(product Product) (*Product, error) {
-	ctx := context.Background()
+// CreateProduct - создание нового продукта.
+func (s *ProductServiceImpl) CreateProduct(ctx context.Context, product Product) (*Product, error) {
 	result, err := s.db.ExecContext(ctx, "INSERT INTO products (manufacturerId, name, description, price) VALUES ($1, $2, $3, $4)", product.ManufacturerID, product.Name, product.Description, product.Price)
 	if err != nil {
 		return nil, err
@@ -78,18 +83,22 @@ func (s *ProductServiceImpl) CreateProduct(product Product) (*Product, error) {
 	if err != nil {
 		return nil, err
 	}
-	product.ID = lastInsertID
+
+	product.ID = fmt.Sprintf("%d", lastInsertID)
 	return &product, nil
 }
 
-func (s *ProductServiceImpl) UpdateProduct(product Product) error {
-	ctx := context.Background()
+// UpdateProduct - обновление продукта.
+func (s *ProductServiceImpl) UpdateProduct(ctx context.Context, product Product) (*Product, error) {
 	_, err := s.db.ExecContext(ctx, "UPDATE products SET manufacturerId = $1, name = $2, description = $3, price = $4 WHERE id = $5", product.ManufacturerID, product.Name, product.Description, product.Price, product.ID)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return &product, nil // Возвращаем обновленный продукт
 }
 
-func (s *ProductServiceImpl) DeleteProduct(id string) error {
-	ctx := context.Background()
+// DeleteProduct - удаление продукта.
+func (s *ProductServiceImpl) DeleteProduct(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM products WHERE id = $1", id)
 	return err
 }

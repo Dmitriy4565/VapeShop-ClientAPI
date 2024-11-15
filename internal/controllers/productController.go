@@ -1,109 +1,111 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/Dmitriy4565/VapeShop/internal/services/productService"
+	"VapeShop-ClientAPI/internal/services"
+
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
+// ProductController - контроллер для работы с продуктами.
 type ProductController struct {
-	productService *productService.ProductService
+	productService services.ProductService
 	validate       *validator.Validate
 }
 
-func NewProductController(productService *productService.ProductService) *ProductController {
+// NewProductController - функция для создания нового контроллера продуктов.
+func NewProductController(productService services.ProductService) *ProductController {
 	return &ProductController{
 		productService: productService,
 		validate:       validator.New(),
 	}
 }
 
-func (c *ProductController) GetProductsHandler(w http.ResponseWriter, r *http.Request) {
-	products, err := c.productService.GetAllProducts()
+// GetProductsHandler - обработчик запроса на получение всех продуктов.
+func (c *ProductController) GetProductsHandler(ctx *gin.Context) {
+	products, err := c.productService.GetAllProducts(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(products)
+	ctx.JSON(http.StatusOK, products)
 }
 
-func (c *ProductController) GetProductByIDHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+// GetProductByIDHandler - обработчик запроса на получение продукта по ID.
+func (c *ProductController) GetProductByIDHandler(ctx *gin.Context) {
+	id := ctx.Param("id")
 	if id == "" {
-		http.Error(w, "ID продукта не указан", http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Product ID is required"})
 		return
 	}
 
-	product, err := c.productService.GetProductByID(id)
+	product, err := c.productService.GetProductByID(ctx, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(product)
+	ctx.JSON(http.StatusOK, product)
 }
 
-func (c *ProductController) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
-	var product productService.Product
-	err := json.NewDecoder(r.Body).Decode(&product)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// CreateProductHandler - обработчик запроса на создание нового продукта.
+func (c *ProductController) CreateProductHandler(ctx *gin.Context) {
+	var product services.Product
+	if err := ctx.ShouldBindJSON(&product); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.validate.Struct(product)
+	err := c.validate.Struct(product)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	newProduct, err := c.productService.CreateProduct(product)
+	newProduct, err := c.productService.CreateProduct(ctx, product)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(newProduct)
+	ctx.JSON(http.StatusOK, newProduct)
 }
 
-func (c *ProductController) UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
-	var product productService.Product
-	err := json.NewDecoder(r.Body).Decode(&product)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// UpdateProductHandler - обработчик запроса на обновление продукта.
+func (c *ProductController) UpdateProductHandler(ctx *gin.Context) {
+	var product services.Product
+	if err := ctx.ShouldBindJSON(&product); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.validate.Struct(product)
+	err := c.validate.Struct(product)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.productService.UpdateProduct(product)
+	updatedProduct, err := c.productService.UpdateProduct(ctx, product) // Изменение: получение обновленного продукта
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
+	ctx.JSON(http.StatusOK, updatedProduct) // Отправка обновленного продукта
 }
 
-func (c *ProductController) DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+// DeleteProductHandler - обработчик запроса на удаление продукта.
+func (c *ProductController) DeleteProductHandler(ctx *gin.Context) {
+	id := ctx.Param("id")
 	if id == "" {
-		http.Error(w, "ID продукта не указан", http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "ID продукта не указан"})
 		return
 	}
 
-	err := c.productService.DeleteProduct(id)
+	err := c.productService.DeleteProduct(ctx, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	ctx.JSON(http.StatusOK, gin.H{"message": "Продукт успешно удален"})
 }

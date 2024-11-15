@@ -1,109 +1,110 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/Dmitriy4565/VapeShop/internal/services/purchaseService"
+	"VapeShop-ClientAPI/internal/services"
+
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
+// PurchaseController - контроллер для работы с покупками.
 type PurchaseController struct {
-	purchaseService *purchaseService.PurchaseService
+	purchaseService services.PurchaseService
 	validate        *validator.Validate
 }
 
-func NewPurchaseController(purchaseService *purchaseService.PurchaseService) *PurchaseController {
+// NewPurchaseController - функция для создания нового контроллера покупок.
+func NewPurchaseController(purchaseService services.PurchaseService) *PurchaseController {
 	return &PurchaseController{
 		purchaseService: purchaseService,
 		validate:        validator.New(),
 	}
 }
 
-func (c *PurchaseController) GetPurchasesHandler(w http.ResponseWriter, r *http.Request) {
-	purchases, err := c.purchaseService.GetAllPurchases()
+// GetPurchasesHandler - обработчик запроса на получение всех покупок.
+func (c *PurchaseController) GetPurchasesHandler(ctx *gin.Context) {
+	purchases, err := c.purchaseService.GetAllPurchases(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(purchases)
+	ctx.JSON(http.StatusOK, purchases)
 }
 
-func (c *PurchaseController) GetPurchaseByIDHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+// GetPurchaseByIDHandler - обработчик запроса на получение покупки по ID.
+func (c *PurchaseController) GetPurchaseByIDHandler(ctx *gin.Context) {
+	id := ctx.Param("id")
 	if id == "" {
-		http.Error(w, "ID покупки не указан", http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "ID покупки не указан"})
 		return
 	}
 
-	purchase, err := c.purchaseService.GetPurchaseByID(id)
+	purchase, err := c.purchaseService.GetPurchaseByID(ctx, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(purchase)
+	ctx.JSON(http.StatusOK, purchase)
 }
 
-func (c *PurchaseController) CreatePurchaseHandler(w http.ResponseWriter, r *http.Request) {
-	var purchase purchaseService.Purchase
-	err := json.NewDecoder(r.Body).Decode(&purchase)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// CreatePurchaseHandler - обработчик запроса на создание новой покупки.
+func (c *PurchaseController) CreatePurchaseHandler(ctx *gin.Context) {
+	var purchase services.Purchase
+	if err := ctx.ShouldBindJSON(&purchase); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.validate.Struct(purchase)
+	err := c.validate.Struct(purchase)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	newPurchase, err := c.purchaseService.CreatePurchase(purchase)
+	newPurchase, err := c.purchaseService.CreatePurchase(ctx, purchase)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(newPurchase)
+	ctx.JSON(http.StatusOK, newPurchase)
 }
 
-func (c *PurchaseController) UpdatePurchaseHandler(w http.ResponseWriter, r *http.Request) {
-	var purchase purchaseService.Purchase
-	err := json.NewDecoder(r.Body).Decode(&purchase)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// UpdateCategoryHandler - обработчик запроса на обновление категории.
+func (c *CategoryController) UpdateCategoryHandler(ctx *gin.Context) {
+	var category services.Category
+	if err := ctx.ShouldBindJSON(&category); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.validate.Struct(purchase)
+	err := c.validate.Struct(category)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.purchaseService.UpdatePurchase(purchase)
+	updatedCategory, err := c.categoryService.UpdateCategory(ctx, category) // Изменено: теперь получаем обновлённую категорию
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
+	ctx.JSON(http.StatusOK, updatedCategory) // Отправляем обновлённую категорию
 }
 
-func (c *PurchaseController) DeletePurchaseHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+// DeletePurchaseHandler - обработчик запроса на удаление покупки
+func (c *PurchaseController) DeletePurchaseHandler(ctx *gin.Context) {
+	id := ctx.Param("id")
 	if id == "" {
-		http.Error(w, "ID покупки не указан", http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "ID покупки не указан"})
 		return
 	}
 
-	err := c.purchaseService.DeletePurchase(id)
+	err := c.purchaseService.DeletePurchase(ctx, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
+	ctx.JSON(http.StatusOK, gin.H{"message": "Покупка успешно удалена"})
 }

@@ -1,93 +1,89 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/Dmitriy4565/VapeShop/internal/services/categoryService"
+	"VapeShop-ClientAPI/internal/services"
+
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
 type CategoryController struct {
-	categoryService *categoryService.CategoryService
+	categoryService services.CategoryService
 	validate        *validator.Validate
 }
 
-func NewCategoryController(categoryService *categoryService.CategoryService) *CategoryController {
+func NewCategoryController(categoryService services.CategoryService) *CategoryController {
 	return &CategoryController{
 		categoryService: categoryService,
 		validate:        validator.New(),
 	}
 }
 
-func (c *CategoryController) GetCategoriesHandler(w http.ResponseWriter, r *http.Request) {
-	categories, err := c.categoryService.GetAllCategories()
+func (c *CategoryController) GetCategoriesHandler(ctx *gin.Context) {
+	categories, err := c.categoryService.GetAllCategories(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(categories)
+	ctx.JSON(http.StatusOK, categories)
 }
 
-func (c *CategoryController) CreateCategoryHandler(w http.ResponseWriter, r *http.Request) {
-	var category categoryService.Category
-	err := json.NewDecoder(r.Body).Decode(&category)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+func (c *CategoryController) CreateCategoryHandler(ctx *gin.Context) {
+	var category services.Category
+	if err := ctx.ShouldBindJSON(&category); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.validate.Struct(category)
+	err := c.validate.Struct(category)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	newCategory, err := c.categoryService.CreateCategory(category)
+	newCategory, err := c.categoryService.CreateCategory(ctx, category)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	json.NewEncoder(w).Encode(newCategory)
+	ctx.JSON(http.StatusOK, newCategory)
 }
 
-func (c *CategoryController) UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) {
-	var category categoryService.Category
-	err := json.NewDecoder(r.Body).Decode(&category)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// UpdatePurchaseHandler - обработчик запроса на обновление покупки.
+func (c *PurchaseController) UpdatePurchaseHandler(ctx *gin.Context) {
+	var purchase services.Purchase
+	if err := ctx.ShouldBindJSON(&purchase); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.validate.Struct(category)
+	err := c.validate.Struct(purchase)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = c.categoryService.UpdateCategory(category)
+	updatedPurchase, err := c.purchaseService.UpdatePurchase(ctx, purchase) // Изменено: теперь получаем обновлённую покупку
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
+	ctx.JSON(http.StatusOK, updatedPurchase) // Отправляем обновлённую покупку
 }
 
-func (c *CategoryController) DeleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+func (c *CategoryController) DeleteCategoryHandler(ctx *gin.Context) {
+	id := ctx.Param("id")
 	if id == "" {
-		http.Error(w, "ID категории не указан", http.StatusBadRequest)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Category ID is required"})
 		return
 	}
 
-	err := c.categoryService.DeleteCategory(id)
+	err := c.categoryService.DeleteCategory(ctx, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
+	ctx.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
 }

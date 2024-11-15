@@ -54,32 +54,6 @@ CREATE TABLE products (
  FOREIGN KEY (manufacturer_id) REFERENCES manufacturers(id)
 );
 
--- Создание таблицы жидкостей (если нужно)
-CREATE TABLE liquids (
- id INT PRIMARY KEY AUTO_INCREMENT,
- name VARCHAR(255) NOT NULL,
- description TEXT,
- price DECIMAL(10, 2) NOT NULL,
- image_url VARCHAR(255),
- brand_id INT,
- nicotine_strength DECIMAL(4, 2),
- flavor VARCHAR(255),
- volume INT,
- vg_pg_ratio VARCHAR(255),
- FOREIGN KEY (brand_id) REFERENCES manufacturers(id)
-);
-
--- Создание таблицы аксессуаров (если нужно)
-CREATE TABLE accessories (
- id INT PRIMARY KEY AUTO_INCREMENT,
- name VARCHAR(255) NOT NULL,
- description TEXT,
- price DECIMAL(10, 2) NOT NULL,
- image_url VARCHAR(255),
- category_id INT,
- FOREIGN KEY (category_id) REFERENCES categories(id)
-);
-
 -- Создание таблицы клиентов
 CREATE TABLE customers (
  id INT PRIMARY KEY AUTO_INCREMENT,
@@ -119,16 +93,6 @@ CREATE TABLE purchase_items (
  quantity INT,
  price DECIMAL(10, 2),
  FOREIGN KEY (purchase_id) REFERENCES purchases(id),
- FOREIGN KEY (product_id) REFERENCES products(id)
-);
-
--- Создание таблицы изменения цен
-CREATE TABLE price_change (
- id INT PRIMARY KEY AUTO_INCREMENT,
- product_id INT,
- old_price DECIMAL(10, 2) NOT NULL,
- new_price DECIMAL(10, 2) NOT NULL,
- changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY (product_id) REFERENCES products(id)
 );
 

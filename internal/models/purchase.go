@@ -10,7 +10,7 @@ type Purchase struct {
 	ProductID  int       `json:"product_id" db:"product_id"`
 	Quantity   int       `json:"quantity" db:"quantity"`
 	TotalPrice float64   `json:"total_price" db:"total_price"`
-	DeliveryID int       `json:"delivery_id" db:"delivery_id"`
+	DeliveryID string    `json:"delivery_id" db:"delivery_id"`
 	Status     string    `json:"status" db:"status"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`

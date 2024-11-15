@@ -1,11 +1,11 @@
-package services //заменить s.db на фактическое подключение к бд, но это в конце после маина
+package services
 
 import (
 	"context"
-	"errors"
-	"time"
-
 	"database/sql"
+	"errors"
+	"fmt"
+	"time"
 )
 
 type Purchase struct {
@@ -19,15 +19,15 @@ type Purchase struct {
 }
 
 type PurchaseService interface {
-	GetAllPurchases() ([]Purchase, error)
-	GetPurchaseByID(id string) (*Purchase, error)
-	CreatePurchase(purchase Purchase) (*Purchase, error)
-	UpdatePurchase(purchase Purchase) error
-	DeletePurchase(id string) error
+	GetAllPurchases(ctx context.Context) ([]Purchase, error)
+	GetPurchaseByID(ctx context.Context, id string) (*Purchase, error)
+	CreatePurchase(ctx context.Context, purchase Purchase) (*Purchase, error)
+	UpdatePurchase(ctx context.Context, purchase Purchase) (*Purchase, error)
+	DeletePurchase(ctx context.Context, id string) error
 }
 
 type PurchaseServiceImpl struct {
-	db *sql.DB // Ссылка на объект базы данных
+	db *sql.DB
 }
 
 func NewPurchaseService(db *sql.DB) *PurchaseServiceImpl {
@@ -36,8 +36,8 @@ func NewPurchaseService(db *sql.DB) *PurchaseServiceImpl {
 	}
 }
 
-func (s *PurchaseServiceImpl) GetAllPurchases() ([]Purchase, error) {
-	rows, err := s.db.QueryContext(context.Background(), "SELECT * FROM purchases")
+func (s *PurchaseServiceImpl) GetAllPurchases(ctx context.Context) ([]Purchase, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT * FROM purchases")
 	if err != nil {
 		return nil, err
 	}
@@ -55,9 +55,9 @@ func (s *PurchaseServiceImpl) GetAllPurchases() ([]Purchase, error) {
 	return purchases, nil
 }
 
-func (s *PurchaseServiceImpl) GetPurchaseByID(id string) (*Purchase, error) {
+func (s *PurchaseServiceImpl) GetPurchaseByID(ctx context.Context, id string) (*Purchase, error) {
 	var purchase Purchase
-	err := s.db.QueryRowContext(context.Background(), "SELECT * FROM purchases WHERE id = $1", id).Scan(&purchase.ID, &purchase.CustomerID, &purchase.StoreID, &purchase.ProductID, &purchase.Quantity, &purchase.CreatedAt, &purchase.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, "SELECT * FROM purchases WHERE id = $1", id).Scan(&purchase.ID, &purchase.CustomerID, &purchase.StoreID, &purchase.ProductID, &purchase.Quantity, &purchase.CreatedAt, &purchase.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("покупка не найдена")
@@ -67,8 +67,7 @@ func (s *PurchaseServiceImpl) GetPurchaseByID(id string) (*Purchase, error) {
 	return &purchase, nil
 }
 
-func (s *PurchaseServiceImpl) CreatePurchase(purchase Purchase) (*Purchase, error) {
-	ctx := context.Background()
+func (s *PurchaseServiceImpl) CreatePurchase(ctx context.Context, purchase Purchase) (*Purchase, error) {
 	result, err := s.db.ExecContext(ctx, "INSERT INTO purchases (customerId, storeId, productId, quantity) VALUES ($1, $2, $3, $4)", purchase.CustomerID, purchase.StoreID, purchase.ProductID, purchase.Quantity)
 	if err != nil {
 		return nil, err
@@ -78,18 +77,30 @@ func (s *PurchaseServiceImpl) CreatePurchase(purchase Purchase) (*Purchase, erro
 	if err != nil {
 		return nil, err
 	}
-	purchase.ID = lastInsertID
+
+	purchase.ID = fmt.Sprintf("%d", lastInsertID)
 	return &purchase, nil
 }
 
-func (s *PurchaseServiceImpl) UpdatePurchase(purchase Purchase) error {
-	ctx := context.Background()
-	_, err := s.db.ExecContext(ctx, "UPDATE purchases SET customerId = $1, storeId = $2, productId = $3, quantity = $4 WHERE id = $5", purchase.CustomerID, purchase.StoreID, purchase.ProductID, purchase.Quantity, purchase.ID)
-	return err
+func (s *PurchaseServiceImpl) UpdatePurchase(ctx context.Context, purchase Purchase) (*Purchase, error) {
+	res, err := s.db.ExecContext(ctx, "UPDATE purchases SET customerId = $1, storeId = $2, productId = $3, quantity = $4 WHERE id = $5", purchase.CustomerID, purchase.StoreID, purchase.ProductID, purchase.Quantity, purchase.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	if rowsAffected == 0 {
+		return nil, errors.New("запись не найдена") // Обработка случая, когда запись не найдена
+	}
+
+	return &purchase, nil // Возвращаем обновлённую покупку
 }
 
-func (s *PurchaseServiceImpl) DeletePurchase(id string) error {
-	ctx := context.Background()
+func (s *PurchaseServiceImpl) DeletePurchase(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM purchases WHERE id = $1", id)
 	return err
 }
