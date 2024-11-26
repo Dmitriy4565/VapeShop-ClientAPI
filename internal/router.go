@@ -24,7 +24,7 @@ func NewServer(cfg *config.Config) *Server {
 	router.Use(middleware.Cors())
 	router.Use(middleware.AuthMiddleware())
 
-	db, err := db.NewDB(cfg.DB)
+	db, err := db.NewDB(cfg.Database)
 	if err != nil {
 		panic(err)
 	}
@@ -52,32 +52,20 @@ func RegisterRoutes(router *gin.Engine, categoryController *controllers.Category
 	v1 := router.Group("/api/v1")
 
 	v1.GET("/categories", categoryController.GetCategoriesHandler)
-	v1.POST("/categories", categoryController.CreateCategoryHandler)
-	v1.GET("/categories/:id", categoryController.GetCategoryHandler)
+	v1.POST("/categories", categoryController.CreateCategoriesHandler)
+	v1.GET("/categories/:id", categoryController.GetCategoriesHandler)
 	v1.PUT("/categories/:id", categoryController.UpdateCategoryHandler)
 	v1.DELETE("/categories/:id", categoryController.DeleteCategoryHandler)
 
 	v1.GET("/products", productController.GetProductsHandler)
 	v1.POST("/products", productController.CreateProductHandler)
-	v1.GET("/products/:id", productController.GetProductHandler)
+	v1.GET("/products/:id", productController.GetProductsHandler)
 	v1.PUT("/products/:id", productController.UpdateProductHandler)
 	v1.DELETE("/products/:id", productController.DeleteProductHandler)
 
 	v1.POST("/purchases", purchaseController.CreatePurchaseHandler)
 	v1.GET("/purchases", purchaseController.GetPurchasesHandler)
-	v1.GET("/purchases/:id", purchaseController.GetPurchaseHandler)
+	v1.GET("/purchases/:id", purchaseController.GetPurchasesHandler)
 	v1.PUT("/purchases/:id", purchaseController.UpdatePurchaseHandler)
 	v1.DELETE("/purchases/:id", purchaseController.DeletePurchaseHandler)
-}
-
-func main() {
-	cfg := config.LoadConfig()
-	if err := cfg.Validate(); err != nil {
-		panic(err)
-	}
-
-	server := NewServer(cfg)
-	if err := server.Run(cfg.ServerAddress); err != nil {
-		panic(err)
-	}
 }

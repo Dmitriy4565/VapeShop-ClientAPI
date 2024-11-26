@@ -57,7 +57,7 @@ func main() {
 		panic(err)
 	}
 
-	db, err := db.NewDB(cfg.DB)
+	db, err := db.NewDB(cfg.Database)
 	if err != nil {
 		panic(err)
 	}

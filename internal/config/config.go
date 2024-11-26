@@ -7,59 +7,51 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Структура для JWT-секрета
-type JWT struct {
-	Secret string `json:"jwt_secret"`
-}
-
-// Структура для конфигурации базы данных
-type Database struct {
-	Host             string `json:"database_host"`
-	Port             int    `json:"database_port"`
-	User             string `json:"database_user"`
-	Password         string `json:"database_password"`
-	Name             string `json:"database_name"`
-	SSLMode          string `yaml:"sslmode"`           // Добавьте sslmode, если нужно
-	ConnectionString string `yaml:"connection_string"` // или строка подключения целиком
-}
-
-// Структура для CORS-конфигурации
-type CORS struct {
-	Origins []string `json:"cors_origins"`
-	Methods []string `json:"cors_methods"`
-	Headers []string `json:"cors_headers"`
-}
-
-// Структура для общей конфигурации приложения
 type Config struct {
-	JWT           JWT      `json:"jwt"`
-	Database      Database `json:"database"`
-	ServerPort    int      `json:"server_port"`
-	ServerAddress string   `json:"server_address"`
-	Debug         bool     `json:"debug"`
-	CORS          CORS     `json:"cors"`
-	DB            Database `yaml:"db"`
+	JWT           JWT           `mapstructure:",squash"`
+	Database      Database      `mapstructure:",squash"`
+	ServerPort    int           `mapstructure:"SERVER_PORT"`
+	ServerAddress string        `mapstructure:"SERVER_ADDRESS"`
+	Debug         bool          `mapstructure:"DEBUG"`
+	CORS          CORS          `mapstructure:",squash"`
+	Timeout       time.Duration `mapstructure:"SERVER_TIMEOUT"`
+}
+
+type JWT struct {
+	Secret string `mapstructure:"JWT_SECRET"`
+}
+
+type Database struct {
+	Host     string `mapstructure:"DATABASE_HOST"`
+	Port     int    `mapstructure:"DATABASE_PORT"`
+	User     string `mapstructure:"DATABASE_USER"`
+	Password string `mapstructure:"DATABASE_PASSWORD"`
+	Name     string `mapstructure:"DATABASE_NAME"`
+	SSLMode  string `mapstructure:"DATABASE_SSLMODE"`
+}
+
+type CORS struct {
+	Origins []string `mapstructure:"CORS_ORIGINS"`
+	Methods []string `mapstructure:"CORS_METHODS"`
+	Headers []string `mapstructure:"CORS_HEADERS"`
 }
 
 // Функция для загрузки конфигурации из файла .env или переменных окружения
 func LoadConfig() (*Config, error) {
-	// Устанавливаем файл конфигурации
 	viper.SetConfigFile(".env")
-
-	// Автоматически читаем переменные окружения
 	viper.AutomaticEnv()
+	viper.SetDefault("DATABASE_SSLMODE", "disable") // Установите значение по умолчанию
+	viper.SetDefault("SERVER_TIMEOUT", "15s")       // Добавлено значение по умолчанию
 
-	// Читаем конфигурацию
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("Ошибка чтения конфигурации: %w", err)
 	}
 
-	// Создаем структуру конфигурации
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("Ошибка разбора конфигурации: %w", err)
 	}
-
+	fmt.Printf("Загруженная конфигурация: %+v\n", cfg)
 	return &cfg, nil
 }
 

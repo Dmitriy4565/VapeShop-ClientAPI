@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"VapeShop-ClientAPI/internal/config"
 )
 
@@ -16,19 +18,23 @@ type DB struct {
 
 // Создание нового подключения к базе данных
 func NewDB(cfg config.Database) (*DB, error) {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name)
+	dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", cfg.User, cfg.Password, cfg.Name)
+	if cfg.Host != "" {
+		dsn += fmt.Sprintf(" host=%s", cfg.Host)
+	}
+	if cfg.Port != 0 {
+		dsn += fmt.Sprintf(" port=%d", cfg.Port)
+	}
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("Ошибка подключения к базе данных: %w", err)
 	}
 
-	// Проверяем подключение с таймаутом
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close() // Close on error
+		_ = db.Close()
 		return nil, fmt.Errorf("Ошибка ping к базе данных: %w", err)
 	}
 

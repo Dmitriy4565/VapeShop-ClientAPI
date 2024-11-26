@@ -30,7 +30,7 @@ func (c *CategoryController) GetCategoriesHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, categories)
 }
 
-func (c *CategoryController) CreateCategoryHandler(ctx *gin.Context) {
+func (c *CategoryController) CreateCategoriesHandler(ctx *gin.Context) {
 	var category services.Category
 	if err := ctx.ShouldBindJSON(&category); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
