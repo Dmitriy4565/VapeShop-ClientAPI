@@ -71,26 +71,25 @@ func (c *PurchaseController) CreatePurchaseHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newPurchase)
 }
 
-// UpdateCategoryHandler - обработчик запроса на обновление категории.
-func (c *CategoryController) UpdateCategoryHandler(ctx *gin.Context) {
-	var category services.Category
-	if err := ctx.ShouldBindJSON(&category); err != nil {
+func (c *PurchaseController) UpdatePurchaseHandler(ctx *gin.Context) {
+	var purchase services.Purchase
+	if err := ctx.ShouldBindJSON(&purchase); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := c.validate.Struct(category)
+	err := c.validate.Struct(purchase)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	updatedCategory, err := c.categoryService.UpdateCategory(ctx, category) // Изменено: теперь получаем обновлённую категорию
+	updatedPurchase, err := c.purchaseService.UpdatePurchase(ctx, purchase) // Изменено: теперь получаем обновлённую покупку
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	ctx.JSON(http.StatusOK, updatedCategory) // Отправляем обновлённую категорию
+	ctx.JSON(http.StatusOK, updatedPurchase) // Отправляем обновлённую покупку
 }
 
 // DeletePurchaseHandler - обработчик запроса на удаление покупки

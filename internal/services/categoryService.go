@@ -4,15 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"time"
 )
 
 type Category struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	StoreID *int64 `json:"store_id"` // Используем sql.NullInt64 для поддержки NULL
 }
 
 type CategoryService interface {
@@ -24,7 +21,7 @@ type CategoryService interface {
 }
 
 type CategoryServiceImpl struct {
-	db *sql.DB // Ссылка на объект базы данных
+	db *sql.DB
 }
 
 func NewCategoryService(db *sql.DB) *CategoryServiceImpl {
@@ -34,7 +31,7 @@ func NewCategoryService(db *sql.DB) *CategoryServiceImpl {
 }
 
 func (s *CategoryServiceImpl) GetAllCategories(ctx context.Context) ([]Category, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT * FROM categories")
+	rows, err := s.db.QueryContext(ctx, "SELECT id, name, store_id FROM categories")
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +40,25 @@ func (s *CategoryServiceImpl) GetAllCategories(ctx context.Context) ([]Category,
 	var categories []Category
 	for rows.Next() {
 		var category Category
-		if err := rows.Scan(&category.ID, &category.Name, &category.CreatedAt, &category.UpdatedAt); err != nil {
+		var storeID sql.NullInt64 // Временная переменная для считывания значения из базы данных
+
+		if err := rows.Scan(&category.ID, &category.Name, &storeID); err != nil {
 			return nil, err
 		}
+
+		// Присваиваем значение StoreID
+		if storeID.Valid {
+			category.StoreID = new(int64) // Создаем новый int64 и присваиваем значение
+			*category.StoreID = storeID.Int64
+		} else {
+			category.StoreID = nil // Устанавливаем в nil, если значение NULL в базе данных
+		}
+
 		categories = append(categories, category)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return categories, nil
@@ -54,46 +66,64 @@ func (s *CategoryServiceImpl) GetAllCategories(ctx context.Context) ([]Category,
 
 func (s *CategoryServiceImpl) GetCategoryByID(ctx context.Context, id string) (*Category, error) {
 	var category Category
-	err := s.db.QueryRowContext(ctx, "SELECT * FROM categories WHERE id = $1", id).Scan(&category.ID, &category.Name, &category.CreatedAt, &category.UpdatedAt)
+
+	// Выполнение запроса с явным указанием столбцов
+	err := s.db.QueryRowContext(ctx, "SELECT id, name, store_id FROM categories WHERE id = $1", id).Scan(
+		&category.ID,
+		&category.Name,
+		&category.StoreID,
+	)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("категория не найдена")
 		}
-		return nil, err
+		return nil, err // Возврат ошибки при других проблемах
 	}
-	return &category, nil
+
+	return &category, nil // Возврат найденной категории
 }
 
 func (s *CategoryServiceImpl) CreateCategory(ctx context.Context, category Category) (*Category, error) {
-	result, err := s.db.ExecContext(ctx, "INSERT INTO categories (name) VALUES ($1)", category.Name)
+	// Используем RETURNING для получения ID вставленной записи
+	query := `
+        INSERT INTO categories (name, store_id) 
+        VALUES ($1, $2) 
+        RETURNING id`
+
+	// Выполняем запрос и сканируем возвращаемый ID в структуру category
+	err := s.db.QueryRowContext(ctx, query, category.Name, category.StoreID).Scan(&category.ID)
+
 	if err != nil {
-		return nil, err
+		return nil, err // Возврат ошибки при выполнении запроса
 	}
 
-	lastInsertID, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-	category.ID = fmt.Sprintf("%d", lastInsertID)
-	return &category, nil
+	return &category, nil // Возврат созданной категории с установленным ID
 }
 
 func (s *CategoryServiceImpl) UpdateCategory(ctx context.Context, category Category) (*Category, error) {
-	res, err := s.db.ExecContext(ctx, "UPDATE categories SET name = $1 WHERE id = $2", category.Name, category.ID)
+	// Проверка существования категории
+	var exists bool
+	err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM categories WHERE id=$1)", category.ID).Scan(&exists)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("ошибка при проверке существования категории")
+	}
+	if !exists {
+		return nil, errors.New("категория не найдена")
 	}
 
-	rowsAffected, err := res.RowsAffected()
+	// Обновление категории
+	query := `
+        UPDATE categories 
+        SET name = $1, store_id = $2 
+        WHERE id = $3`
+
+	_, err = s.db.ExecContext(ctx, query, category.Name, category.StoreID, category.ID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("ошибка при обновлении категории")
 	}
 
-	if rowsAffected == 0 {
-		return nil, errors.New("категория не найдена") // Обработка случая, когда категория не найдена
-	}
-
-	return &category, nil // Возвращаем обновлённую категорию
+	return &category, nil // Возврат обновленной категории с установленным ID
 }
 
 func (s *CategoryServiceImpl) DeleteCategory(ctx context.Context, id string) error {

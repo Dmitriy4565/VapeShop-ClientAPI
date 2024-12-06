@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 
 	"VapeShop-ClientAPI/internal/services"
 
@@ -71,26 +72,29 @@ func (c *ProductController) CreateProductHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newProduct)
 }
 
-// UpdateProductHandler - обработчик запроса на обновление продукта.
 func (c *ProductController) UpdateProductHandler(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "недопустимый ID"})
+		return
+	}
+
 	var product services.Product
 	if err := ctx.ShouldBindJSON(&product); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := c.validate.Struct(product)
+	product.ID = id // Устанавливаем ID для обновления
+
+	updatedProduct, err := c.productService.UpdateProduct(ctx.Request.Context(), product)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	updatedProduct, err := c.productService.UpdateProduct(ctx, product) // Изменение: получение обновленного продукта
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	ctx.JSON(http.StatusOK, updatedProduct) // Отправка обновленного продукта
+	ctx.JSON(http.StatusOK, updatedProduct)
 }
 
 // DeleteProductHandler - обработчик запроса на удаление продукта.
